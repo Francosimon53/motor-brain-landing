@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getSupabase } from "@/lib/supabase";
 
 const API_DOCS = "https://abasensei-motor-brain-production.up.railway.app/docs";
 
@@ -156,6 +157,8 @@ const teamSizes = ["1\u20135 BCBAs", "6\u201315 BCBAs", "16\u201350 BCBAs", "50+
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [formStatus, setFormStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [formError, setFormError] = useState("");
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -403,15 +406,33 @@ export default function Home() {
 
             <form
               className="mt-8 space-y-5"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                const form = e.currentTarget;
-                const data = new FormData(form);
-                const params = new URLSearchParams();
-                data.forEach((v, k) => params.append(k, v.toString()));
-                window.open(`mailto:hello@abasensei.com?subject=Motor Brain Demo Request&body=${encodeURIComponent(
-                  `Name: ${data.get("name")}\nEmail: ${data.get("email")}\nAgency: ${data.get("agency")}\nTeam size: ${data.get("team_size")}`
-                )}`, "_self");
+                setFormStatus("loading");
+                setFormError("");
+
+                const data = new FormData(e.currentTarget);
+                const name = data.get("name")?.toString().trim() ?? "";
+                const email = data.get("email")?.toString().trim() ?? "";
+                const agency = data.get("agency")?.toString().trim() ?? "";
+                const team_size = data.get("team_size")?.toString() ?? "";
+
+                if (!name || !email || !agency || !team_size) {
+                  setFormError("Please fill in all fields.");
+                  setFormStatus("error");
+                  return;
+                }
+
+                const { error } = await getSupabase()
+                  .from("demo_requests")
+                  .insert([{ name, email, agency, team_size }]);
+
+                if (error) {
+                  setFormError("Something went wrong. Please try again or email us directly.");
+                  setFormStatus("error");
+                } else {
+                  setFormStatus("success");
+                }
               }}
             >
               <div>
@@ -462,17 +483,28 @@ export default function Home() {
                   ))}
                 </select>
               </div>
+              {formStatus === "error" && (
+                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">{formError}</p>
+              )}
+
               <button
                 type="submit"
-                className="w-full rounded-full bg-gradient-to-r from-violet-600 to-emerald-600 py-3 font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:shadow-violet-500/40"
+                disabled={formStatus === "loading" || formStatus === "success"}
+                className="w-full rounded-full bg-gradient-to-r from-violet-600 to-emerald-600 py-3 font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:shadow-violet-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Request Free Demo &rarr;
+                {formStatus === "loading" ? "Sending..." : formStatus === "success" ? "Sent!" : "Request Free Demo \u2192"}
               </button>
             </form>
 
-            <p className="mt-5 text-center text-xs text-gray-500">
-              No commitment &middot; BAA included &middot; Setup in 24hrs
-            </p>
+            {formStatus === "success" ? (
+              <p className="mt-5 text-center text-sm text-emerald-400">
+                Thank you! We&apos;ll be in touch within 24 hours with your BAA and demo access.
+              </p>
+            ) : (
+              <p className="mt-5 text-center text-xs text-gray-500">
+                No commitment &middot; BAA included &middot; Setup in 24hrs
+              </p>
+            )}
           </div>
         </div>
       </section>
