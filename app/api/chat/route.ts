@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_URL =
   process.env.MOTOR_BRAIN_API_URL ||
-  "https://web-production-16afd.up.railway.app";
+  "https://abasensei-motor-brain-production.up.railway.app";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -27,15 +27,21 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
 
-  const response = await fetch(`${API_URL}/predecir/rag`, {
+  // Build the last user message as texto
+  const mensajes = body.mensajes || [];
+  const lastUserMsg = [...mensajes].reverse().find((m: { role: string }) => m.role === "user");
+  const texto = lastUserMsg?.content || "";
+
+  const response = await fetch(`${API_URL}/consulta`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": profile.api_key,
     },
     body: JSON.stringify({
-      mensajes: body.mensajes || [],
-      contexto_pdf: body.contexto_pdf || "",
+      texto,
+      contexto: body.contexto_pdf || null,
+      session_id: user.id,
     }),
   });
 
