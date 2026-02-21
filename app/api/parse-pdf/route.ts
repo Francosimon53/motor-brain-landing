@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+// Import from lib/ directly to bypass index.js which has a debug-mode bug
+// that crashes on Vercel (tries to readFileSync a test PDF when module.parent is null)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+const pdfParse = require("pdf-parse/lib/pdf-parse");
 
 export const runtime = "nodejs";
 
