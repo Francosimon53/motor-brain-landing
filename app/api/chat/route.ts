@@ -15,33 +15,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("api_key")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.api_key) {
-    return NextResponse.json({ error: "No API key found" }, { status: 400 });
-  }
-
   const body = await request.json();
 
-  // Build the last user message as texto
   const mensajes = body.mensajes || [];
-  const lastUserMsg = [...mensajes].reverse().find((m: { role: string }) => m.role === "user");
+  const lastUserMsg = [...mensajes]
+    .reverse()
+    .find((m: { role: string }) => m.role === "user");
   const texto = lastUserMsg?.content || "";
 
-  const response = await fetch(`${API_URL}/consulta`, {
+  const response = await fetch(`${API_URL}/predecir`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": profile.api_key,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       texto,
-      contexto: body.contexto_pdf || null,
-      session_id: user.id,
+      contexto: body.contexto_pdf || undefined,
     }),
   });
 
