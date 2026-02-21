@@ -27,13 +27,16 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
 
-  const response = await fetch(`${API_URL}/v1/consulta`, {
+  const response = await fetch(`${API_URL}/predecir/rag`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": profile.api_key,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      mensajes: body.mensajes || [],
+      contexto_pdf: body.contexto_pdf || "",
+    }),
   });
 
   const data = await response.json();
