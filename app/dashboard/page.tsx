@@ -61,7 +61,7 @@ export default function DashboardPage() {
         .from("conversations")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
-        .gte("updated_at", today.toISOString());
+        .gte("created_at", today.toISOString());
       setQueryCount(qc || 0);
     }
     load();

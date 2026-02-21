@@ -6,9 +6,16 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import { createClient } from "@/lib/supabase-browser";
 
+interface Clasificacion {
+  dominio: string;
+  confianza: number;
+  conceptos_clave: string[];
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
+  clasificacion?: Clasificacion | null;
 }
 
 interface Conversation {
@@ -145,7 +152,11 @@ export default function ChatPage() {
         data.message ||
         (typeof data === "string" ? data : JSON.stringify(data));
 
-      const assistantMessage: Message = { role: "assistant", content };
+      const assistantMessage: Message = {
+        role: "assistant",
+        content,
+        clasificacion: data.clasificacion || null,
+      };
       const updatedMessages = [...newMessages, assistantMessage];
       setMessages(updatedMessages);
 
@@ -347,20 +358,43 @@ export default function ChatPage() {
                 key={i}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-sm leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-violet-600/20 text-gray-100"
-                      : "bg-white/[0.04] text-gray-300 border border-white/5"
-                  }`}
-                >
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm prose-invert max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="max-w-[85%]">
+                  {/* Classifier badge for assistant messages */}
+                  {msg.role === "assistant" && msg.clasificacion && (
+                    <div className="mb-2 space-y-1.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-300">
+                        <span>🧠</span>
+                        Domain {msg.clasificacion.dominio} ({(msg.clasificacion.confianza * 100).toFixed(1)}%)
+                      </span>
+                      {msg.clasificacion.conceptos_clave.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {msg.clasificacion.conceptos_clave.map((c, j) => (
+                            <span
+                              key={j}
+                              className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400"
+                            >
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    msg.content
                   )}
+                  <div
+                    className={`rounded-2xl px-5 py-3.5 text-sm leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-violet-600/20 text-gray-100"
+                        : "bg-white/[0.04] text-gray-300 border border-white/5"
+                    }`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm prose-invert max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -381,13 +415,28 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* PDF processing indicator */}
+        {pdfLoading && (
+          <div className="border-t border-white/5 px-4 py-2 md:px-8">
+            <div className="mx-auto flex max-w-3xl items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+                <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Procesando PDF...
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* PDF badge */}
-        {pdfName && (
+        {pdfName && !pdfLoading && (
           <div className="border-t border-white/5 px-4 py-2 md:px-8">
             <div className="mx-auto flex max-w-3xl items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-300">
                 <span>📄</span>
-                {pdfName} ({pdfChars.toLocaleString()} chars)
+                {pdfName} cargado ({pdfChars.toLocaleString()} caracteres extraídos)
               </span>
               <button
                 onClick={() => {
