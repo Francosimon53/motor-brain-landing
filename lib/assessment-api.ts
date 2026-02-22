@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 const ASSESSMENT_API_URL =
   process.env.ASSESSMENT_API_URL ||
+  process.env.MOTOR_BRAIN_API_URL ||
   process.env.NEXT_PUBLIC_MOTOR_BRAIN_API ||
   "https://web-production-d6477.up.railway.app";
 
