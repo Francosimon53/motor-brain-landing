@@ -490,8 +490,15 @@ export default function ChatPage() {
       });
 
       const createData = await createRes.json();
+      console.log("Assessment create response:", createData);
+
       const newAssessmentId =
-        createData.assessment_id || createData.id || "assessment";
+        createData.assessment_id || createData.id;
+      if (!newAssessmentId) {
+        throw new Error(
+          `Backend did not return an assessment ID. Response: ${JSON.stringify(createData)}`
+        );
+      }
       setAssessmentId(newAssessmentId);
 
       // 2. Upload pending files
@@ -667,15 +674,18 @@ export default function ChatPage() {
 
   /* ── Download handler ── */
 
-  async function handleDownload(format: "word" | "pdf", aId?: string) {
+  async function handleDownload(format: "word" | "pdf" | "docx", aId?: string) {
     const targetId = aId || assessmentId;
     if (!targetId) return;
 
     try {
+      // Backend expects "pdf" or "docx", not "word"
+      const backendFormat = format === "word" ? "docx" : format;
+
       const res = await fetch(`/api/assessment/${targetId}/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format }),
+        body: JSON.stringify({ format: backendFormat }),
       });
 
       if (!res.ok) {
@@ -699,7 +709,7 @@ export default function ChatPage() {
           if (!fileRes.ok) throw new Error("Failed to fetch file");
 
           const blob = await fileRes.blob();
-          const ext = format === "word" ? "docx" : "pdf";
+          const ext = backendFormat === "docx" ? "docx" : "pdf";
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
@@ -854,7 +864,7 @@ export default function ChatPage() {
         {targetId && (
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => handleDownload("word", targetId)}
+              onClick={() => handleDownload("docx", targetId)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-teal-500/30 px-3 py-1.5 text-xs font-medium text-teal-400 transition hover:border-teal-500/50 hover:bg-teal-500/10"
             >
               <svg
