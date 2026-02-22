@@ -11,6 +11,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
+    const format = body.format || "pdf";
 
     const res = await fetch(backendUrl(`/v1/assessment/${id}/export`), {
       method: "POST",
@@ -22,21 +23,62 @@ export async function POST(
     });
 
     if (!res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data, { status: res.status });
+      const errText = await res.text();
+      let errData;
+      try {
+        errData = JSON.parse(errText);
+      } catch {
+        errData = { error: errText || "Export failed" };
+      }
+      return NextResponse.json(errData, { status: res.status });
     }
 
+    const contentType = res.headers.get("content-type") || "";
+
+    // Backend returns JSON with a file_path (Supabase Storage URL)
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      const fileUrl =
+        data.file_path || data.url || data.download_url || data.file_url;
+
+      if (fileUrl) {
+        // Fetch the actual file from Supabase Storage
+        const fileRes = await fetch(fileUrl);
+        if (!fileRes.ok) {
+          return NextResponse.json(
+            { error: "Failed to download file from storage" },
+            { status: 502 }
+          );
+        }
+
+        const fileBlob = await fileRes.blob();
+        const ext = format === "word" ? "docx" : "pdf";
+        const headers = new Headers();
+        const fileContentType = fileRes.headers.get("content-type");
+        if (fileContentType) headers.set("Content-Type", fileContentType);
+        headers.set(
+          "Content-Disposition",
+          `attachment; filename="assessment.${ext}"`
+        );
+
+        return new NextResponse(fileBlob, { status: 200, headers });
+      }
+
+      // No file URL — return the JSON so the frontend can handle it
+      return NextResponse.json(data);
+    }
+
+    // Backend returned a direct file stream
     const blob = await res.blob();
     const headers = new Headers();
-    const contentType = res.headers.get("content-type");
-    const contentDisposition = res.headers.get("content-disposition");
-
     if (contentType) headers.set("Content-Type", contentType);
+    const contentDisposition = res.headers.get("content-disposition");
     if (contentDisposition)
       headers.set("Content-Disposition", contentDisposition);
 
     return new NextResponse(blob, { status: 200, headers });
-  } catch {
+  } catch (err) {
+    console.error("Export error:", err);
     return NextResponse.json(
       { error: "Failed to export assessment" },
       { status: 502 }

@@ -678,8 +678,43 @@ export default function ChatPage() {
         body: JSON.stringify({ format }),
       });
 
-      if (!res.ok) throw new Error("Export failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(
+          errData.error || `Export failed (${res.status})`
+        );
+      }
 
+      const contentType = res.headers.get("content-type") || "";
+
+      // If the proxy returned JSON (e.g., with a direct download URL)
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        const fileUrl =
+          data.file_path || data.url || data.download_url || data.file_url;
+
+        if (fileUrl) {
+          // Download from the direct URL
+          const fileRes = await fetch(fileUrl);
+          if (!fileRes.ok) throw new Error("Failed to fetch file");
+
+          const blob = await fileRes.blob();
+          const ext = format === "word" ? "docx" : "pdf";
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `assessment.${ext}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        throw new Error(data.error || "No download URL in response");
+      }
+
+      // Proxy returned the file directly as a blob
       const blob = await res.blob();
       const ext = format === "word" ? "docx" : "pdf";
       const url = URL.createObjectURL(blob);
@@ -690,12 +725,13 @@ export default function ChatPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.error("Download error:", err);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `Failed to download ${format.toUpperCase()} file. Please try again.`,
+          content: `Failed to download ${format.toUpperCase()} file. ${err instanceof Error ? err.message : "Please try again."}`,
         },
       ]);
     }
