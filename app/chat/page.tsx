@@ -111,6 +111,20 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+/** Extract error message from a backend response (FastAPI uses "detail") */
+function extractError(data: Record<string, unknown>, fallback: string): string {
+  if (typeof data.detail === "string") return data.detail;
+  if (Array.isArray(data.detail)) {
+    const msgs = data.detail.map(
+      (d: Record<string, unknown>) => d.msg || JSON.stringify(d)
+    );
+    return msgs.join("; ");
+  }
+  if (typeof data.error === "string") return data.error;
+  if (typeof data.message === "string") return data.message;
+  return fallback;
+}
+
 function parseAssessmentIntent(text: string): AssessmentIntent | null {
   const lower = text.toLowerCase();
 
@@ -507,6 +521,10 @@ export default function ChatPage() {
       const createData = await createRes.json();
       console.log("Assessment create response:", createData);
 
+      if (!createRes.ok) {
+        throw new Error(extractError(createData, "Failed to create assessment"));
+      }
+
       const newAssessmentId =
         createData.assessment_id || createData.id;
       if (!newAssessmentId) {
@@ -527,10 +545,8 @@ export default function ChatPage() {
       );
       if (!uploadRes.ok) {
         const uploadErr = await uploadRes.json().catch(() => ({}));
-        console.error("Upload failed:", uploadErr);
-        throw new Error(
-          uploadErr.detail || uploadErr.error || "File upload failed"
-        );
+        console.error("Upload error response:", uploadErr);
+        throw new Error(extractError(uploadErr, "File upload failed"));
       }
       console.log("Upload response:", await uploadRes.clone().json());
 
@@ -544,9 +560,8 @@ export default function ChatPage() {
       console.log("Generate response:", genData);
 
       if (!genRes.ok) {
-        throw new Error(
-          genData.detail || genData.error || "Assessment generation failed"
-        );
+        console.error("Generate error response:", genData);
+        throw new Error(extractError(genData, "Assessment generation failed"));
       }
 
       // Stop progress simulation
@@ -726,9 +741,9 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(
-          errData.error || `Export failed (${res.status})`
-        );
+        const errMsg = extractError(errData, `Export failed (${res.status})`);
+        console.error("Export error response:", errData);
+        throw new Error(errMsg);
       }
 
       const contentType = res.headers.get("content-type") || "";
