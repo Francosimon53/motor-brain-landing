@@ -297,37 +297,53 @@ export default function ChatPage() {
     setFileUploading(true);
 
     try {
-      // Parse each file via the assessment parse endpoint
+      // Parse files via the assessment parse endpoint
+      // Backend expects field name "files" (plural, array)
       const summaries: string[] = [];
       let combinedText = "";
 
+      const formData = new FormData();
       for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
+        formData.append("files", file);
+      }
 
-        const res = await fetch("/api/assessment/parse", {
-          method: "POST",
-          body: formData,
-        });
+      const res = await fetch("/api/assessment/parse", {
+        method: "POST",
+        body: formData,
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          const summary =
-            data.summary ||
-            data.text?.slice(0, 300) ||
-            `Parsed ${file.name} successfully`;
-          summaries.push(
-            `**${file.name}**: ${summary}${data.text?.length > 300 ? "..." : ""}`
-          );
-          if (data.text) combinedText += data.text + "\n\n";
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Parse response:", data);
+
+        // Handle both array and single document responses
+        if (Array.isArray(data.documents)) {
+          for (const doc of data.documents) {
+            const name = doc.filename || doc.name || "Document";
+            const summary =
+              doc.summary || doc.text?.slice(0, 300) || `Parsed ${name}`;
+            summaries.push(
+              `**${name}**: ${summary}${doc.text?.length > 300 ? "..." : ""}`
+            );
+            if (doc.text) combinedText += doc.text + "\n\n";
+          }
         } else {
-          // Fallback to local PDF parsing for PDFs
+          // Single document or flat response
+          const summary =
+            data.summary || data.text?.slice(0, 300) || "Documents parsed successfully";
+          summaries.push(summary + (data.text?.length > 300 ? "..." : ""));
+          if (data.text) combinedText += data.text + "\n\n";
+        }
+      } else {
+        console.error("Backend parse failed, trying local fallback");
+        // Fallback: parse PDFs locally one by one
+        for (const file of files) {
           if (file.name.toLowerCase().endsWith(".pdf")) {
-            const formDataLocal = new FormData();
-            formDataLocal.append("file", file);
+            const localFd = new FormData();
+            localFd.append("file", file);
             const localRes = await fetch("/api/parse-pdf", {
               method: "POST",
-              body: formDataLocal,
+              body: localFd,
             });
             if (localRes.ok) {
               const localData = await localRes.json();
@@ -485,7 +501,6 @@ export default function ChatPage() {
         body: JSON.stringify({
           assessment_type: intent.assessmentType,
           insurer_id: intent.insurer,
-          hours_requested: intent.hours,
         }),
       });
 
@@ -501,47 +516,66 @@ export default function ChatPage() {
       }
       setAssessmentId(newAssessmentId);
 
-      // 2. Upload pending files
+      // 2. Upload pending files (backend expects field "files", plural)
+      const uploadFormData = new FormData();
       for (const file of pendingFilesRef.current) {
-        const formData = new FormData();
-        formData.append("file", file);
-        await fetch(`/api/assessment/${newAssessmentId}/upload`, {
-          method: "POST",
-          body: formData,
-        });
+        uploadFormData.append("files", file);
       }
+      const uploadRes = await fetch(
+        `/api/assessment/${newAssessmentId}/upload`,
+        { method: "POST", body: uploadFormData }
+      );
+      if (!uploadRes.ok) {
+        const uploadErr = await uploadRes.json().catch(() => ({}));
+        console.error("Upload failed:", uploadErr);
+        throw new Error(
+          uploadErr.detail || uploadErr.error || "File upload failed"
+        );
+      }
+      console.log("Upload response:", await uploadRes.clone().json());
 
-      // 3. Generate all sections
+      // 3. Generate all sections (no request body needed)
       const genRes = await fetch(
         `/api/assessment/${newAssessmentId}/generate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        }
+        { method: "POST" }
       );
 
       const genData = await genRes.json();
+      console.log("Generate response:", genData);
+
+      if (!genRes.ok) {
+        throw new Error(
+          genData.detail || genData.error || "Assessment generation failed"
+        );
+      }
 
       // Stop progress simulation
       if (progressIntervalRef.current)
         clearInterval(progressIntervalRef.current);
 
-      // Show completion message
-      const pageCount = genData.total_pages || genData.pages || 12;
-      const wordCount = genData.total_words || genData.words || 6200;
+      // Show completion message with real data
+      const pageCount = genData.total_pages || genData.pages || genData.page_count;
+      const wordCount = genData.total_words || genData.words || genData.word_count;
+
+      const completionParts = ["Assessment complete"];
+      if (pageCount) completionParts.push(`${pageCount} pages`);
+      if (wordCount)
+        completionParts.push(`~${wordCount.toLocaleString()} words`);
 
       const completeMsg: Message = {
         role: "assistant",
-        content: `Assessment complete — ${pageCount} pages, ~${wordCount.toLocaleString()} words`,
+        content:
+          completionParts.length > 1
+            ? `${completionParts[0]} — ${completionParts.slice(1).join(", ")}`
+            : completionParts[0],
         type: "complete",
         assessmentId: newAssessmentId,
         sections: ASSESSMENT_SECTIONS.map((name) => ({
           name,
           status: "complete" as const,
         })),
-        pageCount,
-        wordCount,
+        ...(pageCount ? { pageCount } : {}),
+        ...(wordCount ? { wordCount } : {}),
       };
 
       setMessages((prev) => {
@@ -555,16 +589,18 @@ export default function ChatPage() {
         saveConversation(prev);
         return prev;
       });
-    } catch {
+    } catch (err) {
+      console.error("Assessment generation error:", err);
       if (progressIntervalRef.current)
         clearInterval(progressIntervalRef.current);
 
+      const errMsg =
+        err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) => {
         const copy = [...prev];
         copy[copy.length - 1] = {
           role: "assistant",
-          content:
-            "Failed to generate assessment. Please try again or contact support.",
+          content: `Failed to generate assessment: ${errMsg}`,
         };
         return copy;
       });

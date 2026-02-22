@@ -10,20 +10,19 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const body = await request.json();
 
+    // Generate endpoint takes no request body — only path + query params
     const res = await fetch(backendUrl(`/v1/assessment/${id}/generate`), {
       method: "POST",
       headers: {
         "X-API-Key": ctx.apiKey,
-        "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
     });
 
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
-  } catch {
+  } catch (err) {
+    console.error("Generate proxy error:", err);
     return NextResponse.json(
       { error: "Failed to generate assessment" },
       { status: 502 }
