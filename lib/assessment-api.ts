@@ -36,5 +36,7 @@ export async function getAuthContext() {
 }
 
 export function backendUrl(path: string): string {
-  return `${ASSESSMENT_API_URL}${path}`;
+  const url = `${ASSESSMENT_API_URL}${path}`;
+  console.log(`[assessment-api] base=${ASSESSMENT_API_URL} → ${url}`);
+  return url;
 }

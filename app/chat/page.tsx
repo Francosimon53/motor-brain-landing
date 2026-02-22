@@ -509,6 +509,7 @@ export default function ChatPage() {
 
     try {
       // 1. Create assessment
+      console.log("[Step 1] Creating assessment...");
       const createRes = await fetch("/api/assessment/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -519,22 +520,24 @@ export default function ChatPage() {
       });
 
       const createData = await createRes.json();
-      console.log("Assessment create response:", createData);
+      console.log("[Step 1] Create response:", createRes.status, createData);
 
       if (!createRes.ok) {
-        throw new Error(extractError(createData, "Failed to create assessment"));
+        throw new Error(`[Create ${createRes.status}] ${extractError(createData, "Failed to create assessment")}`);
       }
 
       const newAssessmentId =
         createData.assessment_id || createData.id;
       if (!newAssessmentId) {
         throw new Error(
-          `Backend did not return an assessment ID. Response: ${JSON.stringify(createData)}`
+          `[Create] No assessment ID in response: ${JSON.stringify(createData)}`
         );
       }
       setAssessmentId(newAssessmentId);
+      console.log("[Step 1] Assessment ID:", newAssessmentId);
 
       // 2. Upload pending files (backend expects field "files", plural)
+      console.log("[Step 2] Uploading", pendingFilesRef.current.length, "files to assessment", newAssessmentId);
       const uploadFormData = new FormData();
       for (const file of pendingFilesRef.current) {
         uploadFormData.append("files", file);
@@ -543,25 +546,25 @@ export default function ChatPage() {
         `/api/assessment/${newAssessmentId}/upload`,
         { method: "POST", body: uploadFormData }
       );
+      const uploadData = await uploadRes.json().catch(() => ({ raw: "non-JSON response" }));
+      console.log("[Step 2] Upload response:", uploadRes.status, uploadData);
+
       if (!uploadRes.ok) {
-        const uploadErr = await uploadRes.json().catch(() => ({}));
-        console.error("Upload error response:", uploadErr);
-        throw new Error(extractError(uploadErr, "File upload failed"));
+        throw new Error(`[Upload ${uploadRes.status}] ${extractError(uploadData, "File upload failed")}`);
       }
-      console.log("Upload response:", await uploadRes.clone().json());
 
       // 3. Generate all sections (no request body needed)
+      console.log("[Step 3] Generating assessment", newAssessmentId);
       const genRes = await fetch(
         `/api/assessment/${newAssessmentId}/generate`,
         { method: "POST" }
       );
 
-      const genData = await genRes.json();
-      console.log("Generate response:", genData);
+      const genData = await genRes.json().catch(() => ({ raw: "non-JSON response" }));
+      console.log("[Step 3] Generate response:", genRes.status, genData);
 
       if (!genRes.ok) {
-        console.error("Generate error response:", genData);
-        throw new Error(extractError(genData, "Assessment generation failed"));
+        throw new Error(`[Generate ${genRes.status}] ${extractError(genData, "Assessment generation failed")}`);
       }
 
       // Stop progress simulation
