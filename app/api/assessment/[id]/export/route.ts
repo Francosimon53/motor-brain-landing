@@ -52,7 +52,7 @@ export async function POST(
         }
 
         const fileBlob = await fileRes.blob();
-        const ext = format === "word" ? "docx" : "pdf";
+        const ext = format === "pdf" ? "pdf" : "docx";
         const headers = new Headers();
         const fileContentType = fileRes.headers.get("content-type");
         if (fileContentType) headers.set("Content-Type", fileContentType);

@@ -17,11 +17,22 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+    console.log(`Create response ${res.status}:`, data);
     return NextResponse.json(data, { status: res.status });
-  } catch {
+  } catch (err) {
+    console.error("Create proxy exception:", err);
     return NextResponse.json(
-      { error: "Failed to create assessment" },
+      {
+        error: "Failed to create assessment",
+        detail: err instanceof Error ? err.message : String(err),
+      },
       { status: 502 }
     );
   }

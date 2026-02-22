@@ -19,12 +19,22 @@ export async function POST(
       },
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+    console.log(`Generate response ${res.status}:`, data);
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
-    console.error("Generate proxy error:", err);
+    console.error("Generate proxy exception:", err);
     return NextResponse.json(
-      { error: "Failed to generate assessment" },
+      {
+        error: "Failed to generate assessment",
+        detail: err instanceof Error ? err.message : String(err),
+      },
       { status: 502 }
     );
   }
