@@ -2,9 +2,7 @@ import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
 const ASSESSMENT_API_URL =
-  process.env.ASSESSMENT_API_URL ||
-  process.env.NEXT_PUBLIC_MOTOR_BRAIN_API ||
-  "https://web-production-d6477.up.railway.app";
+  (process.env.ASSESSMENT_API_URL || "https://web-production-d6477.up.railway.app").trim();
 
 export async function getAuthContext() {
   const supabase = await createClient();

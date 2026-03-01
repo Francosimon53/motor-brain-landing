@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 
-const USE_OLLAMA = process.env.USE_OLLAMA === "true";
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "motorbrain-aba";
+const USE_OLLAMA = process.env.USE_OLLAMA?.trim() === "true";
+const OLLAMA_URL = (process.env.OLLAMA_URL || "http://localhost:11434").trim();
+const OLLAMA_MODEL = (process.env.OLLAMA_MODEL || "motorbrain-aba").trim();
 const RAILWAY_URL =
-  process.env.MOTOR_BRAIN_API_URL ||
-  "https://abasensei-motor-brain-production.up.railway.app";
+  (process.env.MOTOR_BRAIN_API_URL || "https://abasensei-motor-brain-production.up.railway.app").trim();
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
