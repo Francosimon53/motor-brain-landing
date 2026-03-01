@@ -8,9 +8,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Motor Brain — Clinical AI for ABA Agencies | HIPAA Compliant",
+  title: "Motor Brain — AI SOAP Notes & Assessments for BCBAs | HIPAA Compliant",
   description:
-    "Clinical queries, documentation, and a private knowledge base for BCBAs and RBTs. HIPAA-compliant by design with embedded PHI sanitization and BAA included.",
+    "Finish session notes in 2 minutes. Send a voice note, get a complete SOAP note in 30 seconds. AI-powered assessments that insurance approves on the first try. Built for BCBAs.",
 };
 
 export default function RootLayout({
