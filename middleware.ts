@@ -31,7 +31,12 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  if (!user && (path.startsWith("/dashboard") || path.startsWith("/chat"))) {
+  if (
+    !user &&
+    (path.startsWith("/dashboard") ||
+      path.startsWith("/chat") ||
+      path.startsWith("/revision"))
+  ) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -43,5 +48,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/chat/:path*", "/login", "/api/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/chat/:path*",
+    "/revision/:path*",
+    "/login",
+    "/api/:path*",
+  ],
 };
