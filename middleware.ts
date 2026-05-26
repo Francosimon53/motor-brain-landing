@@ -31,17 +31,32 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  if (!user && (path.startsWith("/dashboard") || path.startsWith("/chat"))) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (
+    !user &&
+    (path.startsWith("/dashboard") ||
+      path.startsWith("/chat") ||
+      path.startsWith("/revision"))
+  ) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", path + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
   }
 
   if (user && path === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const next = request.nextUrl.searchParams.get("next");
+    const dest = next && next.startsWith("/") ? next : "/dashboard";
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/chat/:path*", "/login", "/api/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/chat/:path*",
+    "/revision/:path*",
+    "/login",
+    "/api/:path*",
+  ],
 };
