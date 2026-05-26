@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase-browser";
 import WeaknessMap from "./WeaknessMap";
 import ReviewQueue from "./ReviewQueue";
 import BeforeAfter from "./BeforeAfter";
@@ -16,6 +18,16 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function RevisionConsole({ email }: { email: string }) {
   const [tab, setTab] = useState<Tab>("weakness");
+  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -42,6 +54,13 @@ export default function RevisionConsole({ email }: { email: string }) {
             >
               Panel
             </Link>
+            <button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {signingOut ? "Saliendo..." : "Cerrar sesión"}
+            </button>
           </div>
         </div>
       </header>

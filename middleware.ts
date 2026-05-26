@@ -37,11 +37,15 @@ export async function middleware(request: NextRequest) {
       path.startsWith("/chat") ||
       path.startsWith("/revision"))
   ) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", path + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
   }
 
   if (user && path === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const next = request.nextUrl.searchParams.get("next");
+    const dest = next && next.startsWith("/") ? next : "/dashboard";
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return supabaseResponse;

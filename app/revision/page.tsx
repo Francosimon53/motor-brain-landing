@@ -9,7 +9,7 @@ export default async function RevisionPage() {
   const access = await getReviewerAccess();
 
   if (!access.ok && access.reason === "unauthenticated") {
-    redirect("/login");
+    redirect("/login?next=/revision");
   }
 
   if (!access.ok) {

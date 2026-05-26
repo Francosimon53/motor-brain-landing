@@ -4,14 +4,23 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 
-type Mode = "signin" | "signup" | "magic";
+type Mode = "magic" | "signin" | "signup";
+
+// Reads the same-origin `next` redirect target from the URL, ignoring
+// absolute/off-site values to avoid open-redirects.
+function getNext(): string | null {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") ? next : null;
+}
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>("magic");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
@@ -23,6 +32,8 @@ export default function LoginPage() {
     setError("");
     setMessage("");
 
+    const next = getNext();
+
     if (mode === "signin") {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -30,7 +41,7 @@ export default function LoginPage() {
       });
       if (error) setError(error.message);
       else {
-        router.push("/dashboard");
+        router.push(next ?? "/dashboard");
         router.refresh();
       }
     } else if (mode === "signup") {
@@ -42,15 +53,21 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else if (data.user && !data.session) {
-        setMessage("Check your email to confirm your account.");
+        setMessage("Revisa tu correo para confirmar tu cuenta.");
       } else {
-        router.push("/dashboard");
+        router.push(next ?? "/dashboard");
         router.refresh();
       }
     } else {
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const callback = `${window.location.origin}/auth/callback${
+        next ? `?next=${encodeURIComponent(next)}` : ""
+      }`;
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: callback },
+      });
       if (error) setError(error.message);
-      else setMessage("Check your email for the login link.");
+      else setSent(true);
     }
 
     setLoading(false);
@@ -58,6 +75,57 @@ export default function LoginPage() {
 
   const inputClass =
     "w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50";
+
+  // Confirmation state after a magic link is sent.
+  if (sent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950 px-6">
+        <div className="w-full max-w-md text-center">
+          <a
+            href="/"
+            className="mb-8 block text-2xl font-bold tracking-tight"
+          >
+            <span className="bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">
+              Motor Brain
+            </span>
+          </a>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/10">
+              <svg
+                className="h-6 w-6 text-emerald-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+                />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold">Revisa tu correo</h1>
+            <p className="mt-2 text-sm text-gray-400">
+              Enviamos un enlace de acceso a{" "}
+              <span className="text-gray-200">{email}</span>. Ábrelo en este
+              dispositivo para entrar.
+            </p>
+            <button
+              onClick={() => {
+                setSent(false);
+                setMessage("");
+                setError("");
+              }}
+              className="mt-6 text-sm text-gray-400 transition hover:text-white"
+            >
+              &larr; Usar otro correo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-950 px-6">
@@ -74,15 +142,15 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
           <h1 className="mb-6 text-center text-xl font-bold">
             {mode === "signin"
-              ? "Sign in to your account"
+              ? "Inicia sesión"
               : mode === "signup"
-                ? "Create your account"
-                : "Sign in with magic link"}
+                ? "Crea tu cuenta"
+                : "Entrar con enlace mágico"}
           </h1>
 
           {/* Mode tabs */}
           <div className="mb-6 flex gap-1 rounded-lg bg-white/5 p-1">
-            {(["signin", "signup", "magic"] as Mode[]).map((m) => (
+            {(["magic", "signin", "signup"] as Mode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => {
@@ -96,11 +164,11 @@ export default function LoginPage() {
                     : "text-gray-400 hover:text-white"
                 }`}
               >
-                {m === "signin"
-                  ? "Sign In"
-                  : m === "signup"
-                    ? "Sign Up"
-                    : "Magic Link"}
+                {m === "magic"
+                  ? "Enlace mágico"
+                  : m === "signin"
+                    ? "Iniciar sesión"
+                    : "Registrarse"}
               </button>
             ))}
           </div>
@@ -109,7 +177,7 @@ export default function LoginPage() {
             {mode === "signup" && (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                  Full name
+                  Nombre completo
                 </label>
                 <input
                   type="text"
@@ -117,14 +185,14 @@ export default function LoginPage() {
                   onChange={(e) => setFullName(e.target.value)}
                   required
                   className={inputClass}
-                  placeholder="Dr. Jane Smith"
+                  placeholder="Dra. Jane Smith"
                 />
               </div>
             )}
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                Email
+                Correo electrónico
               </label>
               <input
                 type="email"
@@ -132,14 +200,14 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className={inputClass}
-                placeholder="you@agency.com"
+                placeholder="tucorreo@ejemplo.com"
               />
             </div>
 
             {mode !== "magic" && (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                  Password
+                  Contraseña
                 </label>
                 <input
                   type="password"
@@ -170,19 +238,19 @@ export default function LoginPage() {
               className="w-full rounded-full bg-gradient-to-r from-violet-600 to-emerald-600 py-3 font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:shadow-violet-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading
-                ? "Loading..."
+                ? "Cargando..."
                 : mode === "signin"
-                  ? "Sign In"
+                  ? "Iniciar sesión"
                   : mode === "signup"
-                    ? "Create Account"
-                    : "Send Magic Link"}
+                    ? "Crear cuenta"
+                    : "Enviar enlace mágico"}
             </button>
           </form>
         </div>
 
         <p className="mt-6 text-center text-xs text-gray-500">
           <a href="/" className="transition hover:text-gray-300">
-            &larr; Back to home
+            &larr; Volver al inicio
           </a>
         </p>
       </div>
