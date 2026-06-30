@@ -7,13 +7,15 @@ import { createClient } from "@/lib/supabase-browser";
 import WeaknessMap from "./WeaknessMap";
 import ReviewQueue from "./ReviewQueue";
 import BeforeAfter from "./BeforeAfter";
+import ConceptQueue from "./ConceptQueue";
 
-type Tab = "weakness" | "queue" | "diff";
+type Tab = "weakness" | "queue" | "diff" | "concepts";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "weakness", label: "Mapa de debilidades" },
   { id: "queue", label: "Cola de revisión" },
   { id: "diff", label: "Antes y después" },
+  { id: "concepts", label: "Conceptos" },
 ];
 
 export default function RevisionConsole({ email }: { email: string }) {
@@ -92,6 +94,7 @@ export default function RevisionConsole({ email }: { email: string }) {
         {tab === "weakness" && <WeaknessMap />}
         {tab === "queue" && <ReviewQueue />}
         {tab === "diff" && <BeforeAfter />}
+        {tab === "concepts" && <ConceptQueue />}
       </main>
     </div>
   );
